@@ -108,7 +108,7 @@ def make_kml(name, df):
 
 
 def make_header():
-    with open('data/lib/kml_header.kml', 'r') as f:
+    with open('lib/kml_header.kml', 'r') as f:
         header = f.read()
     return header
 
