@@ -9,7 +9,7 @@ import os
 
 
 ########################################
-###########txtファイル読み込み###########
+###########txtファイル読み込み##########
 ########################################
 
 def read_add(path):
@@ -48,6 +48,47 @@ def separate_columns_add(add_lines):
     df['EL'] = el
     df['SNR'] = snr
     df['L1_MP'] = l1_mp
+    return df
+
+
+########################################
+###########posファイル読み込み##########
+########################################
+
+def read_pos(path):
+    """
+    posファイルを読み込みデータフレームに変換する
+    """
+    with open(path, "r") as f:
+        lines = [s.strip() for s in f.readlines()]
+
+    count = 0
+    for s in lines:
+        if '%' in s:
+            count += 1
+        else:
+            break
+    del lines[0:count-1]
+    return lines
+
+
+def separate_columns_pos(lines):
+    """
+    読み込んだファイルのリストをカラムごとにデータフレームに変換する
+    """
+    for s in lines:
+        if '%' in s:
+            columns = s.split()
+            del columns[0]
+            df = pd.DataFrame(columns=columns)
+            continue
+        data_l = s.split()
+        data_l[1] = data_l[1][:-2]
+        gpst = ' '.join(data_l[0:2])
+        del data_l[0:2]
+        data_l.insert(0, gpst)
+        data_s = pd.Series(data_l, index=df.columns)
+        df = df.append(data_s, ignore_index=True)
     return df
 
 
@@ -90,6 +131,73 @@ def make_kml(name, df):
             los_line_l.append(satpos_str)
             #点描画用リストの作成
             los_points_l.append([df_copy['GPST'].iloc[i], satpos_str])
+
+        #kmlファイルを作成
+        #ヘッダ部分を作成
+        header_kml = make_header()
+        #line描画部分を作成
+        los_line_kml = make_los_line(los_line_l)
+        #point描画部分を作成
+        los_point_kml = make_los_point(los_points_l)
+        #フッタ部分を作成
+        footer_kml = '</Document>\n</kml>'
+
+
+        los_kml = header_kml + los_line_kml + los_point_kml + footer_kml
+        with open(name + '/'+ sat + '.kml', 'w') as f:
+            f.write(los_kml)
+
+
+def make_kml_kinematic(name, df_sat, df_pos):
+    count = 0
+    sat_l = list(dict.fromkeys(df_sat['SAT'].values.tolist()))
+    for sat in sat_l:
+        #obsファイルの現在時刻のデータ数を出力
+        row0 = count
+        for i in range(row0, df_sat.shape[0]):
+            if df_sat['SAT'].iloc[i] == sat:
+                count += 1
+                #行列最後の調整
+                if count == df_sat.shape[0]:
+                    end_index = count
+            else:
+                end_index = count
+                break
+        #同じ衛星のデータフレームを作成
+        df_sat_copy = df_sat[['GPST', 'AZ', 'EL']].iloc[row0:end_index].copy()
+
+        los_line_l, los_points_l = [], []
+        for i in range(df_pos.shape[0]):
+            if i == 0:
+                add_counter = 0
+            #posファイルの時刻がaddファイルに合っているか確認
+            for j in range(df_sat_copy.shape[0]):
+                if not df_pos['GPST'].iloc[i] == df_sat_copy['GPST'].iloc[add_counter]:
+                    if add_counter >= df_sat_copy.shape[0]-1:
+                        break
+                    add_counter += 1
+                else:
+                    break
+            pos_l = [float(df_pos['latitude(deg)'].iloc[i]), float(df_pos['longitude(deg)'].iloc[i]),\
+                     float(df_pos['height(m)'].iloc[i])]
+            pos_sea_l = [pos_l[1], pos_l[0], float(pos_l[2])-elp_sea_diff]
+            pos_sea_str = ','.join(map(str, pos_sea_l))
+            los_line_l.append(pos_sea_str)
+            #衛星位置をllhに直す（hは標高）
+            az = float(df_sat_copy['AZ'].iloc[add_counter])
+            el = float(df_sat_copy['EL'].iloc[add_counter])
+            satpos_l = plr2llh([length, az, el], pos_l)
+            satpos_l[0] = round(satpos_l[0], 9)
+            satpos_l[1] = round(satpos_l[1], 9)
+            satpos_l[2] = round(satpos_l[2]-elp_sea_diff, 3)
+            #経度、緯度、標高の順番に直し、strに変換
+            satpos_str = ','.join(map(str, [satpos_l[1], satpos_l[0], satpos_l[2]]))
+
+            #線描画用リストの作成
+            los_line_l.append(satpos_str)
+            los_line_l.append(pos_sea_str)
+            #点描画用リストの作成
+            los_points_l.append([df_pos['GPST'].iloc[i], pos_sea_str])
 
         #kmlファイルを作成
         #ヘッダ部分を作成
@@ -235,22 +343,37 @@ def plr2llh(plr, llh0):
     return llh
 
 
+
 args = sys.argv
 
-base_llh = [float(args[2]), float(args[3]), float(args[4])]
-#海抜の楕円体高
-elp_sea_diff = float(args[5])
-base_llh_sea = [base_llh[0], base_llh[1], round(base_llh[2]-elp_sea_diff, 3)]
-#経度、緯度、標高の順番に直し、strに変換
-out_base_llh_sea_str = ','.join(map(str, [base_llh_sea[1], base_llh_sea[0], base_llh_sea[2]]))
+#LOS直線の長さを設定[m]
 length = 100
 
-path = args[1]
-lines = read_add(path)
-df = separate_columns_add(lines)
-
+add_path = args[2]
 #kmlファイルを収納するディレクトリを作成
-if not os.path.exists(path[:-4]):
-    os.mkdir(path[:-4])
+if not os.path.exists(add_path[:-4]):
+    os.mkdir(add_path[:-4])
 
-make_kml(path[:-4], df)
+
+if args[1] == 'static':
+    base_llh = [float(args[3]), float(args[4]), float(args[5])]
+    #海抜の楕円体高
+    elp_sea_diff = float(args[6])
+    base_llh_sea = [base_llh[0], base_llh[1], round(base_llh[2]-elp_sea_diff, 3)]
+    #経度、緯度、標高の順番に直し、strに変換
+    out_base_llh_sea_str = ','.join(map(str, [base_llh_sea[1], base_llh_sea[0], base_llh_sea[2]]))
+
+    lines = read_add(add_path)
+    df = separate_columns_add(lines)
+
+    make_kml(add_path[:-4], df)
+
+elif args[1] == 'kinematic':
+    df_pos = separate_columns_pos(read_pos(args[3]))
+    df_sat = separate_columns_add(read_add(add_path))
+    elp_sea_diff = float(args[4])
+    make_kml_kinematic(add_path[:-4], df_sat, df_pos)
+
+else:
+    print('第一引数にstatic or kinematicを入力してください')
+    sys.exit()
