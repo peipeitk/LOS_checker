@@ -4,16 +4,19 @@ google earth proで衛星とアンテナ間の視線ベクトルを表示するk
 
 ・実行コマンド
 静止点解析
-python LOS_checker.py static (rtkplotで出力した仰角、方位角テキストファイル) (観測点緯度)　(観測点経度)　(観測点楕円体高度)　(観測点ジオイド高)
+$ python LOS_checker.py static (rtkplotで出力した仰角、方位角テキストファイル) (観測点緯度)　(観測点経度)　(観測点楕円体高度)　(観測点ジオイド高)
 移動体解析
-python LOS_checker.py kinematic (rtkplotで出力した仰角、方位角テキストファイル) (観測点posファイル) (観測点ジオイド高)
+$ python LOS_checker.py kinematic (rtkplotで出力した仰角、方位角テキストファイル) (観測点posファイル) (観測点ジオイド高)
 
 ・実行コマンド例
-python LOS_checker.py static sample_static.txt 34.54650625015037 135.50210414238964 63.02384679485112 38.026
-python LOS_checker.py kinematic sample_kinematic.txt PPK.pos 38.026
+$ python LOS_checker.py static sample_static.txt 34.54650625015037 135.50210414238964 63.02384679485112 38.026
+$ python LOS_checker.py kinematic sample_kinematic.txt PPK.pos 38.026
 
 
 準備
+・pythonにnumpyとpandasをダウンロード
+$ pip install numpy
+$ pip install pandas
 
 ・仰角、方位角テキストファイルの作成方法
 rtkplot.exeでobsファイルを開く
