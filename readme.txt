@@ -47,3 +47,8 @@ https://vldb.gsi.go.jp/sokuchi/surveycalc/geoid/calcgh/calc_f.html
 
 ・Google Earth Proのインストール
 https://support.google.com/earth/answer/21955?hl=ja
+
+
+サブツール buildings2kml.py
+建物情報テキストファイルの建物の頂点座標をkmlファイルに変換し, Google Earthで表示する.
+$ python buildings2kml.py OPU_buildings.txt
